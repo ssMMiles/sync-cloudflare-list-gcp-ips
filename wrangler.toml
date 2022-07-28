@@ -1,0 +1,9 @@
+name = "sync-cloudflare-list-gcp-ips"
+main = "src/index.ts"
+compatibility_date = "2022-07-28"
+
+workers_dev = false
+usage_model = "bundled"
+
+[triggers]
+crons = [ "*/3 * * * *" ]
