@@ -37,11 +37,7 @@ interface IP_RANGES {
 
 export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    try {
-      await updateIpRanges(env);
-    } catch (e: any) {
-      console.error(e);
-    }
+    return updateIpRanges(env);
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -54,56 +50,52 @@ export default {
   },
 };
 
-async function updateIpRanges(env: Env) {
-  try {
-    const data = await fetch(IP_RANGES_URI).then((res) => {
-      if (!res.ok) {
-        throw new Error(`Failed to fetch ${IP_RANGES_URI}`);
-      }
-
-      return res.json();
-    });
-
-    const { prefixes } = data as IP_RANGES;
-    if (!Array.isArray(prefixes)) {
-      throw new Error(`Fetched invalid IP range data: ${JSON.stringify(data)}`);
+async function updateIpRanges(env: Env): Promise<void> {
+  const data = await fetch(IP_RANGES_URI).then((res) => {
+    if (!res.ok) {
+      throw new Error(`Failed to fetch ${IP_RANGES_URI}`);
     }
 
-    const ipRanges = prefixes.reduce((ipRanges, prefix) => {
-      if (prefix.scope === env.GCP_SCOPE) {
-        let ip;
+    return res.json();
+  });
 
-        if ("ipv4Prefix" in prefix) {
-          ip = prefix.ipv4Prefix;
-        }
-
-        if ("ipv6Prefix" in prefix) {
-          ip = prefix.ipv6Prefix;
-        }
-
-        if (ip) {
-          ipRanges.push({ ip, comment: "Added by https://github.com/ssMMiles/sync-cloudflare-list-gcp-ips" });
-        }
-      }
-
-      return ipRanges;
-    }, [] as { ip: string; comment: string }[]);
-
-    const result = await fetch(CF_API_REPLACE_LIST_ITEMS(env.CF_ACCOUNT_ID, env.CF_LIST_ID), {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.CF_API_TOKEN}`,
-      },
-      body: JSON.stringify(ipRanges),
-    });
-
-    if (!result.ok) {
-      throw new Error(`Failed to replace IP ranges - ${result.status}: ${result.statusText}`);
-    }
-
-    return;
-  } catch (e) {
-    throw e;
+  const { prefixes } = data as IP_RANGES;
+  if (!Array.isArray(prefixes)) {
+    throw new Error(`Fetched invalid IP range data: \n${JSON.stringify(data)}`);
   }
+
+  const ipRanges = prefixes.reduce((ipRanges, prefix) => {
+    if (prefix.scope === env.GCP_SCOPE) {
+      let ip;
+
+      if ("ipv4Prefix" in prefix) {
+        ip = prefix.ipv4Prefix;
+      }
+
+      if ("ipv6Prefix" in prefix) {
+        ip = prefix.ipv6Prefix;
+      }
+
+      if (ip) {
+        ipRanges.push({ ip, comment: "Added by https://github.com/ssMMiles/sync-cloudflare-list-gcp-ips" });
+      }
+    }
+
+    return ipRanges;
+  }, [] as { ip: string; comment: string }[]);
+
+  const result = await fetch(CF_API_REPLACE_LIST_ITEMS(env.CF_ACCOUNT_ID, env.CF_LIST_ID), {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.CF_API_TOKEN}`,
+    },
+    body: JSON.stringify(ipRanges),
+  });
+
+  if (!result.ok) {
+    throw new Error(`Failed to replace IP ranges - ${await result.json()}`);
+  }
+
+  return;
 }
