@@ -11,4 +11,4 @@ Set the following keys using `wrangler secret put <KEY>`:
  - `CF_API_TOKEN`: An API token with Edit permissions on `Account Filter Lists`.
  - `CF_LIST_ID`: The ID of the list in which the IPs will be stored.
  
- - `GCP_SCOPE`: One of the scopes in [GCP's IP ranges](https://www.gstatic.com/ipranges/cloud.json), e.g `us-east1`
+ - `GCP_SCOPE`: A comma seperated list of desired scopes in [GCP's IP ranges](https://www.gstatic.com/ipranges/cloud.json). Also accepts "*" as a wildcard.

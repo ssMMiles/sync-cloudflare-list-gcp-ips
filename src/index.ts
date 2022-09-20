@@ -1,5 +1,4 @@
 /**
- * Welcome to Cloudflare Workers! This is your first scheduled worker.
  *
  * - Run `wrangler dev --local` in your terminal to start a development server
  * - Run `curl "http://localhost:8787/cdn-cgi/mf/scheduled"` to trigger the scheduled event
@@ -36,11 +35,19 @@ interface IP_RANGES {
 }
 
 export default {
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
     return updateIpRanges(env);
   },
 
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<Response> {
     try {
       await updateIpRanges(env);
       return new Response("OK", { status: 200 });
@@ -64,8 +71,12 @@ async function updateIpRanges(env: Env): Promise<void> {
     throw new Error(`Fetched invalid IP range data: \n${JSON.stringify(data)}`);
   }
 
+  const scopes =
+    env.GCP_SCOPE.trim() === "*"
+      ? true
+      : env.GCP_SCOPE.split(",").map((s) => s.trim());
   const ipRanges = prefixes.reduce((ipRanges, prefix) => {
-    if (prefix.scope === env.GCP_SCOPE) {
+    if (scopes === true || scopes.includes(prefix.scope)) {
       let ip;
 
       if ("ipv4Prefix" in prefix) {
@@ -77,21 +88,28 @@ async function updateIpRanges(env: Env): Promise<void> {
       }
 
       if (ip) {
-        ipRanges.push({ ip, comment: "Added by https://github.com/ssMMiles/sync-cloudflare-list-gcp-ips" });
+        ipRanges.push({
+          ip,
+          comment:
+            "Added by https://github.com/ssMMiles/sync-cloudflare-list-gcp-ips",
+        });
       }
     }
 
     return ipRanges;
   }, [] as { ip: string; comment: string }[]);
 
-  const result = await fetch(CF_API_REPLACE_LIST_ITEMS(env.CF_ACCOUNT_ID, env.CF_LIST_ID), {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.CF_API_TOKEN}`,
-    },
-    body: JSON.stringify(ipRanges),
-  });
+  const result = await fetch(
+    CF_API_REPLACE_LIST_ITEMS(env.CF_ACCOUNT_ID, env.CF_LIST_ID),
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.CF_API_TOKEN}`,
+      },
+      body: JSON.stringify(ipRanges),
+    }
+  );
 
   if (!result.ok) {
     throw new Error(`Failed to replace IP ranges - ${await result.json()}`);
